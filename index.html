@@ -72,18 +72,16 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  /* Soft interior square fill matching the active color */
   background-color: currentColor;
   border: 1px solid currentColor;
   opacity: 0;
   pointer-events: none;
-  /* Box-shadow generates a true square-shaped glow that bleeds outwards from the edges */
   box-shadow: 0 0 25px 4px currentColor;
   transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1;
 }
 .hero-matrix-cell.pulse-active::after {
-  opacity: 0.35; /* Perfectly balanced intensity */
+  opacity: 0.35; 
 }
 
 .hero-content {
@@ -388,12 +386,12 @@ footer {
             <div class="pane-grid-line" style="left:50%; top:0; bottom:0; width:1px;"></div>
 
             <div class="chunk" data-type="rect" data-color="#ff4b5c" style="top:40px; left:20px; width:90px; height:90px; transform: rotate(0deg);">
-              <svg><rect x="0" y="0" width="100%" height="100%" fill="#ff4b5c" opacity="0.75"/></svg>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="0" y="0" width="100%" height="100%" fill="#ff4b5c" opacity="0.75"/></svg>
               <div class="gizmo-overlay"><div class="gizmo-handle gizmo-scale"></div><div class="gizmo-handle gizmo-rotate"></div></div>
             </div>
 
             <div class="chunk" data-type="tri" data-color="#ffb600" style="top:180px; left:110px; width:100px; height:100px; transform: rotate(15deg);">
-              <svg><polygon points="50,0 100,100 0,100" fill="#ffb600" opacity="0.75"/></svg>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="50,0 100,100 0,100" fill="#ffb600" opacity="0.75"/></svg>
               <div class="gizmo-overlay"><div class="gizmo-handle gizmo-scale"></div><div class="gizmo-handle gizmo-rotate"></div></div>
             </div>
           </div>
@@ -538,7 +536,8 @@ footer {
   const addShapeBtn = document.getElementById('add-shape');
 
   let selectedChunk = null;
-  const shapeTypes = ['rect', 'tri', 'trapezoid', 'diamond', 'poly'];
+  // STRICT CLEAN POOL: Circle, Perfect Square, Triangle
+  const shapeTypes = ['circle', 'rect', 'tri'];
   const shapeColors = ['#ff4b5c', '#ffb600', '#00e5ff', '#a020f0', '#00ff66'];
 
   function resizeCanvas() {
@@ -593,14 +592,10 @@ footer {
       ctx.beginPath();
       if (type === 'rect') {
         ctx.fillRect(0, 0, w, h);
+      } else if (type === 'circle') {
+        ctx.arc(w / 2, h / 2, w / 2, 0, 2 * Math.PI);
       } else if (type === 'tri') {
         ctx.moveTo(w / 2, 0); ctx.lineTo(w, h); ctx.lineTo(0, h);
-      } else if (type === 'trapezoid') {
-        ctx.moveTo(w * 0.25, 0); ctx.lineTo(w * 0.75, 0); ctx.lineTo(w, h); ctx.lineTo(0, h);
-      } else if (type === 'diamond') {
-        ctx.moveTo(w / 2, 0); ctx.lineTo(w, h / 2); ctx.lineTo(w / 2, h); ctx.lineTo(0, h / 2);
-      } else if (type === 'poly') {
-        ctx.moveTo(w * 0.3, 0); ctx.lineTo(w, h * 0.2); ctx.lineTo(w * 0.8, h); ctx.lineTo(0, h * 0.8);
       }
       ctx.closePath();
       ctx.fill();
@@ -613,7 +608,7 @@ footer {
 
   function initChunkInteractions(chunk) {
     let isDragging = false, isScaling = false, isRotating = false;
-    let startX, startY, startWidth, startHeight, startAngle;
+    let startX, startY, startSize, startAngle;
 
     chunk.addEventListener('mousedown', (e) => {
       e.stopPropagation();
@@ -628,7 +623,7 @@ footer {
       if (target.classList.contains('gizmo-scale')) {
         isScaling = true;
         startX = e.clientX; startY = e.clientY;
-        startWidth = chunk.offsetWidth; startHeight = chunk.offsetHeight;
+        startSize = chunk.offsetWidth; // Use single size baseline to maintain 1:1 scale aspect ratio
       } else if (target.classList.contains('gizmo-rotate')) {
         isRotating = true;
         const rect = chunk.getBoundingClientRect();
@@ -649,8 +644,11 @@ footer {
         y = Math.max(0, Math.min(y, pane.clientHeight - chunk.offsetHeight));
         chunk.style.left = `${x}px`; chunk.style.top = `${y}px`;
       } else if (isScaling) {
-        chunk.style.width = `${Math.max(40, Math.min(startWidth + (e.clientX - startX), 200))}px`;
-        chunk.style.height = `${Math.max(40, Math.min(startHeight + (e.clientY - startY), 200))}px`;
+        // Enforce 1:1 Aspect Ratio so squares don't turn into rectangles and circles don't turn into ellipses
+        const delta = Math.max(e.clientX - startX, e.clientY - startY);
+        const newSize = Math.max(40, Math.min(startSize + delta, 200));
+        chunk.style.width = `${newSize}px`;
+        chunk.style.height = `${newSize}px`;
       } else if (isRotating) {
         const rect = chunk.getBoundingClientRect();
         const currentAngle = Math.atan2(e.clientY - (rect.top + rect.height/2), e.clientX - (rect.left + rect.width/2));
@@ -684,10 +682,8 @@ footer {
     newBlock.style.cssText = "top:100px; left:60px; width:90px; height:90px; transform:rotate(0deg);";
 
     let svgInner = `<rect x="0" y="0" width="100%" height="100%" fill="${color}" opacity="0.75"/>`;
+    if (type === 'circle') svgInner = `<circle cx="50" cy="50" r="50" fill="${color}" opacity="0.75"/>`;
     if (type === 'tri') svgInner = `<polygon points="50,0 100,100 0,100" fill="${color}" opacity="0.75"/>`;
-    if (type === 'trapezoid') svgInner = `<polygon points="25,0 75,0 100,100 0,100" fill="${color}" opacity="0.75"/>`;
-    if (type === 'diamond') svgInner = `<polygon points="50,0 100,50 50,100 0,50" fill="${color}" opacity="0.75"/>`;
-    if (type === 'poly') svgInner = `<polygon points="30,0 100,20 85,100 0,75" fill="${color}" opacity="0.75"/>`;
 
     newBlock.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${svgInner}</svg><div class="gizmo-overlay"><div class="gizmo-handle gizmo-scale"></div><div class="gizmo-handle gizmo-rotate"></div></div>`;
     pane.appendChild(newBlock); initChunkInteractions(newBlock); renderProjection();
